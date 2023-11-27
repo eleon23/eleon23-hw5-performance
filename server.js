@@ -16,11 +16,17 @@ async function connectClient() {
     console.log("Server started and connected to MongoDB");
     server.get("/carts/:id", async function get(conn) {
       const cart = parseInt(conn.params.id);
-
+      collection.createIndex({cart: 1})
       try {
-        const data = await collection.find({ cart }).toArray();
-        const total = data.reduce((a, e) => (a += e.price * e.quantity), 0);
+        const pipelines = [
+          { $match: { cart, } },
+          { $group: { _id: null, total: { $sum: { $multiply: ['$price', '$quantity'] } } } }
+        ];
+
+        const result = await collection.aggregate(pipelines).toArray();
+        const total = result.length > 0 ? result[0].total : 0;
         conn.send({ total });
+        
       } catch (err) {
         console.error(err);
         conn
